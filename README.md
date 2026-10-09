@@ -1,7 +1,7 @@
 # How to install
 Paste this link into the Install Plugin section of Revenge client.
 
-https://furretar.github.io/Override-User-Avatars-Revenge-Plugin/Override-User-Avatars
+https://dxckie-cell.github.io/Override-User-Avatars-Revenge-Plugin-/Override-User-Avatars/
 
 Supports overriding the profile picture of multiple users. In the plugin settings, tap "+ Add user" and enter each user's ID and image URL. Changes apply immediately.
 
