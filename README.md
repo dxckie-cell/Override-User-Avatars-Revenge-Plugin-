@@ -3,7 +3,7 @@ Paste this link into the Install Plugin section of Revenge client.
 
 https://furretar.github.io/Override-User-Avatars-Revenge-Plugin/Override-User-Avatars
 
-Only allows for changing one user's profile, feel free to modify and pull request.
+Supports overriding the profile picture of multiple users. In the plugin settings, tap "+ Add user" and enter each user's ID and image URL. Changes apply immediately.
 
 # Known Issues
 Does not change the profile picture on notifications.

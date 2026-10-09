@@ -9,11 +9,45 @@ let patches = [];
 
 export { default as settings } from "./settings";
 
+export interface AvatarOverride {
+    id: string;
+    url: string;
+}
+
+// migrate the old single-user settings (targetUserId / imageUrl) into the new list
+function initStorage(): void {
+    if (!Array.isArray(storage.overrides)) {
+        storage.overrides = [];
+    }
+
+    if (storage.targetUserId || storage.imageUrl) {
+        if (storage.targetUserId && storage.imageUrl) {
+            storage.overrides = [
+                ...storage.overrides,
+                { id: storage.targetUserId, url: storage.imageUrl }
+            ];
+        }
+        delete storage.targetUserId;
+        delete storage.imageUrl;
+    }
+}
+
+// looks up the override at call time so edits in settings apply without reloading
+function getOverrideUrl(userId?: string): string | undefined {
+    if (!userId) return undefined;
+    const list: AvatarOverride[] = storage.overrides ?? [];
+    for (const entry of list) {
+        if (entry?.id?.trim() === userId && entry.url?.trim()) {
+            return entry.url.trim();
+        }
+    }
+    return undefined;
+}
+
 export function onLoad(): void {
     console.log(`${TAG} loaded`);
 
-    const TARGET_ID = storage.targetUserId;
-    const OVERRIDE_URL = storage.imageUrl;
+    initStorage();
 
     const UserStore = findByStoreName("UserStore");
     if (!UserStore) {
@@ -27,21 +61,19 @@ export function onLoad(): void {
         return;
     }
 
-
-
     // patch getUserAvatarSource, overrides avatar in DMs and group chats
     if (avatarModule.getUserAvatarSource) {
         const originalGetUserAvatarSource = avatarModule.getUserAvatarSource;
         avatarModule.getUserAvatarSource = function (...args) {
-            const user = args[0];
+            const overrideUrl = getOverrideUrl(args[0]?.id);
 
-            // only intercept target user
-            if (user?.id === TARGET_ID) {
+            // only intercept users that have an override
+            if (overrideUrl) {
                 const original = originalGetUserAvatarSource.apply(this, args);
                 if (original) {
                     return {
                         ...original,
-                        uri: OVERRIDE_URL
+                        uri: overrideUrl
                     };
                 }
             }
@@ -54,10 +86,10 @@ export function onLoad(): void {
     // patch getUserAvatarURL, overrides avatar in voice calls
     const originalGetUserAvatarURL = avatarModule.getUserAvatarURL;
     avatarModule.getUserAvatarURL = function (...args) {
-        const user = args[0];
-        // only intercept for target user
-        if (user?.id === TARGET_ID) {
-            return OVERRIDE_URL;
+        const overrideUrl = getOverrideUrl(args[0]?.id);
+        // only intercept for users that have an override
+        if (overrideUrl) {
+            return overrideUrl;
         }
         // ignore other users
         return originalGetUserAvatarURL.apply(this, args);
@@ -66,16 +98,18 @@ export function onLoad(): void {
 
     console.log(`${TAG} patches applied`);
 
-    // refresh ui
-    try {
-        FluxDispatcher.dispatch({
-            type: "USER_UPDATE",
-            user: UserStore.getUser(TARGET_ID)
-        });
-        console.log(`${TAG} ui refreshed`);
-    } catch (e) {
-        console.log(`${TAG} could not trigger refresh:`, e.message);
+    // refresh ui for every overridden user
+    for (const entry of storage.overrides as AvatarOverride[]) {
+        try {
+            const user = entry?.id ? UserStore.getUser(entry.id.trim()) : null;
+            if (user) {
+                FluxDispatcher.dispatch({ type: "USER_UPDATE", user });
+            }
+        } catch (e) {
+            console.log(`${TAG} could not trigger refresh for ${entry?.id}:`, e.message);
+        }
     }
+    console.log(`${TAG} ui refreshed`);
 }
 
 export function onUnload(): void {
